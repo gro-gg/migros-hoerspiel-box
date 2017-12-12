@@ -21,9 +21,9 @@ Da normalerweise eine CD in mehrere Dateien unterteilt ist, muss man die einzeln
 
 Da die Box nur über einen Lautsprecher verfügt, kann die Datei ruhig als mono codiert werden. Ich verwende dafür den Sound Converter:
 
-    sudo apt-get install 
+    sudo apt-get install
     sudo apt-get install soundconverter
-    
+
 Unter den Preferences kann "Force mono output" ausgewählt werden. Die Hör-Box unterstützt keine variable Bitrate (VBR).
 
 
@@ -33,10 +33,49 @@ Für die Konvertierung benötigt man ein XOR Tool:
     git clone https://github.com/hellman/xortool.git
     cd xortool
     sudo python setup.py install
-    
+
 Die vorbereitete .mp3 Datei muss nun lediglich mit dem ASCII-Wert "f" codiert werden:
 
     xortool/xortool-xor -f merged_MP3WRAP.mp3 -s "f" > M01.smp
 
 Somit kann jede Figur (M01 bis M??.smp") mit einer eingenen Audiodatei belegt werden.
 
+## Forensik
+Wie kommt man nun darauf, wie man die .smp Dateien auf der Box codieren muss?
+Hier eine etwas technische Herleitung.
+
+Als erstes schauen wir mal, was das Unix-Helferchen ´file´ zu den Dateien auf der Box meint:
+
+    % file *.smp
+    M01.smp:  data
+    M02.smp:  data
+    ...
+
+Leider werden die Files nicht erkannt.
+Schaut man sich nun die Dateien etwas ganauer an, merkt man, dass sie alle mit der gleichen Header-Sequenz beginnen:
+
+    % for f in M??.smp; do hexdump -C $f | head -n 1; done
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+    00000000  99 9c b6 66 11 02 66 66  66 66 66 66 66 66 66 66  |...f..ffffffffff|
+
+Ein erster Check auf  [Wikipedia](https://en.wikipedia.org/wiki/List_of_file_signatures) und eine Google-Suche bringen jedoch noch keine Resultate für ein Dateiformat das mit der Bytefolge "99 9c" beginnt.
+
+Als zweites sticht einem natürlich die vielen 66 ins Auge. Dies ist eher ungewöhnlich, da Binary-Dateien nach einer definierten Header-Sequenz oft ein paar 00 enthalten, bis an einer bestimmten Stelle der eignentliche Payload beginnt. Dies könnte also darauf hindeuten dass die Dateien mit einer Byte-weisen Transformation codiert wurden. Das naheliegenste ist natürlich XOR. Um von einem Byte auf 00 zu kommen muss es mit sich selber XOR codieren, in unserem Fall also 66 was dem ASCII-Wert "f" entspricht.
+
+    for f in M??.smp; do xortool/xortool-xor -f $f -s "f" > $f.xor; done
+
+    file *.smp.xor
+    M01.smp.xor: MPEG ADTS, layer III, v1, 256 kbps, 44.1 kHz, Stereo
+    M02.smp.xor: MPEG ADTS, layer III, v1, 256 kbps, 44.1 kHz, Stereo
+    ...
+
+Voilà! Wir haben MPEG layer III, also MP3 ...
