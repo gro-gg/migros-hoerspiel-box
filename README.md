@@ -21,7 +21,6 @@ Da normalerweise eine CD in mehrere Dateien unterteilt ist, muss man die einzeln
 
 Da die Box nur über einen Lautsprecher verfügt, kann die Datei ruhig als mono codiert werden. Ich verwende dafür den Sound Converter:
 
-    sudo apt-get install
     sudo apt-get install soundconverter
 
 Unter den Preferences kann "Force mono output" ausgewählt werden. Die Hör-Box unterstützt keine variable Bitrate (VBR).
